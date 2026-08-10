@@ -1,0 +1,17 @@
+# Raw datasets
+data/raw/*.csv
+data/raw/*.csv.gz
+
+# Processed datasets
+data/processed/
+
+# Power BI temporary files
+*.tmp
+*.pbit
+
+# VS Code
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
