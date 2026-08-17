@@ -1,5 +1,5 @@
 -- ============================================================
--- AIRBNB-004: HOST & LISTING PERFORMANCE ANALYSIS
+-- AIRBNB-004: BUSINESS ANALYSIS
 -- Dataset: Airbnb NYC Listings
 -- Database: airbnb
 -- Table: listings
@@ -9,138 +9,153 @@ use airbnb;
 
 
 -- q1. how many unique hosts are in the dataset?
+
 select
-count(distinct host_id) as unique_host_count
+    count(distinct host_id) as unique_host_count
 from listings;
 
--- q2. how many listings does each host have?
-select
-host_id,
-host_name,
-count(*) as each_host_count
-from listings
-group by host_id,host_name;
 
--- q3. which 10 hosts have the most listings?
+-- q2. which 10 hosts have the most listings?
+
 select
-host_id,
-count(*) as total_listings
+    host_id,
+    count(*) as total_listings
 from listings
 group by host_id
 order by total_listings desc
-limit 10 ;
+limit 10;
 
 
--- q4. which 10 hosts have the highest total number of reviews?
+-- q3. which 10 hosts have the highest total number of reviews?
+
 select
-host_id,
-count(number_of_reviews) as total_reviews
+    host_id,
+    sum(number_of_reviews) as total_reviews
 from listings
 group by host_id
 order by total_reviews desc
-limit 10 ;
+limit 10;
 
 
--- q5. which 10 hosts have the highest average number of reviews
---     per listing?
+-- q4. which 10 hosts have the highest average reviews per listing?
+
 select
-host_id,
-avg(number_of_reviews) as total_avg_reviews
+    host_id,
+    round(avg(number_of_reviews), 2) as average_reviews
 from listings
 group by host_id
-order by total_avg_reviews desc
-limit 10 ;
+order by average_reviews desc
+limit 10;
 
--- q6. which 10 hosts have the highest average rating proxy based
---     on reviews_per_month?
-select
-host_id,
-avg(reviews_per_month) as total_avg_reviews_month
-from listings
-group by host_id
-order by total_avg_reviews desc
-limit 10 ;
 
--- q7. how many listings does each host have by room type?
-select
-host_id,
-room_type,
-count(*) as total_listings
-from listings
-group by host_id, room_type;
+-- q5. which hosts manage listings in multiple neighbourhoods?
 
--- q8. which hosts manage listings in multiple neighbourhoods?
 select
-host_id,
-count(distinct neighbourhood) as neighbourhood_count
-from listings
-group by host_id
-having count(distinct neighbourhood) > 1;
-
--- q9. which 10 hosts operate in the most neighbourhoods?
-select
-host_id,
-count(distinct neighbourhood) as neighbourhood_count
+    host_id,
+    count(distinct neighbourhood) as neighbourhood_count
 from listings
 group by host_id
 having count(distinct neighbourhood) > 1
-order by neighbourhood_count desc
-limit 10;
+order by neighbourhood_count desc;
 
--- q10. which 10 hosts have the highest average listing price?
+
+-- q6. which 10 hosts have the highest average listing price?
+
 select
-host_id,
-avg(price) as highest_average_price
+    host_id,
+    round(avg(price), 2) as average_price
 from listings
 group by host_id
-order by highest_average_price desc
+order by average_price desc
 limit 10;
 
--- q11. which hosts have more than 10 listings and an average price
+
+-- q7. which hosts have more than 10 listings and an average price
 --     above the overall average listing price?
+
 select
-host_id,
-count(*) as total_listings,
-round(avg(price), 2) as average_price
+    host_id,
+    count(*) as total_listings,
+    round(avg(price), 2) as average_price
 from listings
 group by host_id
 having count(*) > 10
-and avg(price) > (
-	select avg(price)
-	from listings
-	)
+   and avg(price) > (
+       select avg(price)
+       from listings
+   )
 order by average_price desc;
 
--- q12. how many listings does each host have that have never
---     received a review?
+
+-- q8. which hosts have many listings but relatively low review activity?
+
 select
-host_id,
-sum(case when number_of_reviews = 0 then 1 else 0 end) as listings_without_reviews
+    host_id,
+    count(*) as total_listings,
+    sum(number_of_reviews) as total_reviews,
+    round(avg(number_of_reviews), 2) as average_reviews
 from listings
 group by host_id
-having listings_without_reviews > 0;
+having count(*) >= 10
+   and avg(number_of_reviews) < 10
+order by total_listings desc;
 
--- q14. which 10 hosts have the highest average availability_365?
+
+-- q9. which hosts have fewer listings but relatively high review activity?
+
 select
-host_id,
-avg(availability_365) as avg_availability_365
+    host_id,
+    count(*) as total_listings,
+    sum(number_of_reviews) as total_reviews,
+    round(avg(number_of_reviews), 2) as average_reviews
 from listings
 group by host_id
-order by avg_availability_365 desc
-limit 10 ;
+having count(*) <= 3
+   and avg(number_of_reviews) > 100
+order by average_reviews desc;
 
--- q15. which 10 hosts have the lowest average availability_365?
+
+-- q10. what percentage of all listings are controlled by the
+--      top 10 hosts?
+
 select
-host_id,
-avg(availability_365) as avg_availability_365
-from listings
-group by host_id
-order by avg_availability_365 asc
-limit 10 ;
+    round(
+        100.0 * sum(total_listings) /
+        (select count(*) from listings),
+        2
+    ) as top_10_host_listing_percentage
+from (
+    select
+        host_id,
+        count(*) as total_listings
+    from listings
+    group by host_id
+    order by total_listings desc
+    limit 10
+) as top_hosts;
 
 
--- q16. compare hosts with 1 listing against hosts with multiple
---     listings. compare their average price.
+-- q11. what percentage of all listings are controlled by hosts
+--      with more than 10 listings?
+
+select
+    round(
+        100.0 * sum(total_listings) /
+        (select count(*) from listings),
+        2
+    ) as percentage_of_listings
+from (
+    select
+        host_id,
+        count(*) as total_listings
+    from listings
+    group by host_id
+    having count(*) > 10
+) as multi_listing_hosts;
+
+
+-- q12. compare hosts with 1 listing against hosts with multiple
+--      listings. compare their average price.
 
 select
     case
@@ -159,8 +174,9 @@ from (
 group by host_type;
 
 
--- q17. compare hosts with 1 listing against hosts with multiple
---     listings. compare their average reviews.
+-- q13. compare hosts with 1 listing against hosts with multiple
+--      listings. compare their average reviews.
+
 select
     case
         when host_listing_count = 1 then 'single_listing'
@@ -177,114 +193,199 @@ from (
 ) as host_summary
 group by host_type;
 
--- q18. which hosts have listings across multiple room types?
-select
-host_id,
-count(distinct room_type) as unique_room_count
-from listings 
-group by host_id
-having count(distinct room_type) >1;
 
+-- q14. which neighbourhoods have high average prices but
+--      relatively low competition?
 
--- q19. which 10 hosts have the highest combined number of reviews
---     and listings?
 select
-host_id,
-count(*) as total_listings,
-sum(number_of_reviews) as total_reviews
-from listings
-group by host_id
-order by total_reviews desc ,total_listings desc
-limit 10;
-
--- q20. identify hosts that have many listings but relatively
---     low review activity.
-select
-    host_id,
+    neighbourhood,
     count(*) as total_listings,
-    sum(number_of_reviews) as total_reviews,
-    round(avg(number_of_reviews), 2) as average_reviews
+    round(avg(price), 2) as average_price
 from listings
-group by host_id
-having count(*) >= 10
-   and avg(number_of_reviews) < 10
+group by neighbourhood
+having count(*) < (
+    select avg(total_listings)
+    from (
+        select
+            neighbourhood,
+            count(*) as total_listings
+        from listings
+        group by neighbourhood
+    ) as neighbourhood_counts
+)
+and avg(price) > (
+    select avg(average_price)
+    from (
+        select
+            neighbourhood,
+            avg(price) as average_price
+        from listings
+        group by neighbourhood
+    ) as neighbourhood_prices
+)
+order by average_price desc;
+
+
+-- q15. which neighbourhoods have high listing volume but
+--      relatively low average prices?
+
+select
+    neighbourhood,
+    count(*) as total_listings,
+    round(avg(price), 2) as average_price
+from listings
+group by neighbourhood
+having count(*) > (
+    select avg(total_listings)
+    from (
+        select
+            neighbourhood,
+            count(*) as total_listings
+        from listings
+        group by neighbourhood
+    ) as neighbourhood_counts
+)
+and avg(price) < (
+    select avg(average_price)
+    from (
+        select
+            neighbourhood,
+            avg(price) as average_price
+        from listings
+        group by neighbourhood
+    ) as neighbourhood_prices
+)
 order by total_listings desc;
 
--- q21. identify hosts that have fewer listings but relatively
---     high review activity.
+
+-- q16. which room types appear to have the strongest market presence?
+
 select
-    host_id,
+    room_type,
     count(*) as total_listings,
-    sum(number_of_reviews) as total_reviews,
+    round(
+        100.0 * count(*) / (select count(*) from listings),
+        2
+    ) as listing_percentage
+from listings
+group by room_type
+order by total_listings desc;
+
+
+-- q17. which neighbourhood and room-type combinations have
+--      the highest average price?
+
+select
+    neighbourhood,
+    room_type,
+    count(*) as total_listings,
+    round(avg(price), 2) as average_price
+from listings
+group by neighbourhood, room_type
+having count(*) >= 10
+order by average_price desc
+limit 10;
+
+
+-- q18. which neighbourhoods have high supply but low review activity?
+
+select
+    neighbourhood,
+    count(*) as total_listings,
     round(avg(number_of_reviews), 2) as average_reviews
 from listings
-group by host_id
-having count(*) <= 3
-   and avg(number_of_reviews) > 100
-order by average_reviews desc;
+group by neighbourhood
+having count(*) > (
+    select avg(total_listings)
+    from (
+        select
+            neighbourhood,
+            count(*) as total_listings
+        from listings
+        group by neighbourhood
+    ) as neighbourhood_counts
+)
+and avg(number_of_reviews) < (
+    select avg(average_reviews)
+    from (
+        select
+            neighbourhood,
+            avg(number_of_reviews) as average_reviews
+        from listings
+        group by neighbourhood
+    ) as neighbourhood_reviews
+)
+order by total_listings desc;
 
--- q22. what percentage of all listings are controlled by the
---     top 10 hosts?
+
+-- q19. which neighbourhoods have low supply but high average prices?
+
 select
-    round(
-        100.0 * sum(total_listings) / (select count(*) from listings),
-        2
-    ) as top_10_host_listing_percentage
-from (
-    select
-        host_id,
-        count(*) as total_listings
-    from listings
-    group by host_id
-    order by total_listings desc
-    limit 10
-) as top_hosts;
+    neighbourhood,
+    count(*) as total_listings,
+    round(avg(price), 2) as average_price
+from listings
+group by neighbourhood
+having count(*) < (
+    select avg(total_listings)
+    from (
+        select
+            neighbourhood,
+            count(*) as total_listings
+        from listings
+        group by neighbourhood
+    ) as neighbourhood_counts
+)
+and avg(price) > (
+    select avg(average_price)
+    from (
+        select
+            neighbourhood,
+            avg(price) as average_price
+        from listings
+        group by neighbourhood
+    ) as neighbourhood_prices
+)
+order by average_price desc;
 
--- q23. what percentage of all listings are controlled by hosts
---     with more than 10 listings?
+
+-- q20. which listings have high reviews, high availability,
+--      and relatively low prices?
+
 select
-    round(
-        100.0 * sum(total_listings) / (select count(*) from listings),
-        2
-    ) as percentage_of_listings
-from (
-    select
-        host_id,
-        count(*) as total_listings
+    id,
+    name,
+    neighbourhood,
+    room_type,
+    price,
+    number_of_reviews,
+    availability_365
+from listings
+where number_of_reviews > (
+    select avg(number_of_reviews)
     from listings
-    group by host_id
-    having count(*) > 10
-) as multi_listing_hosts;
+)
+and availability_365 > (
+    select avg(availability_365)
+    from listings
+)
+and price < (
+    select avg(price)
+    from listings
+)
+order by number_of_reviews desc
+limit 20;
 
--- q24. based on the analysis above, what insights can Airbnb
---     management learn about host behaviour and listing performance?
 
+-- q21. which neighbourhoods appear attractive for a new host
+--      based on listing volume, average price, and review activity?
 
--- q24. based on the analysis above, what insights can airbnb
---     management learn about host behaviour and listing performance?
-
--- 1. a small number of hosts may control a significant share of
---    the total listings, indicating that the market includes both
---    individual hosts and professional or multi-listing hosts.
-
--- 2. hosts with multiple listings can have different pricing
---    behaviour compared with hosts managing only one listing.
-
--- 3. hosts operating multiple listings across different
---    neighbourhoods may have a broader market presence.
-
--- 4. hosts with many listings but low review activity may require
---    further investigation into listing performance and guest engagement.
-
--- 5. hosts with fewer listings but high review activity may have
---    strong guest engagement despite having a smaller portfolio.
-
--- 6. comparing listing count, price, reviews, and availability
---    helps identify different host strategies.
-
--- 7. high listing volume does not necessarily mean high performance.
---    review activity and availability should also be considered.
-
--- 8. Airbnb management can use these metrics to identify high-volume
---    hosts, understand host behaviour, and identify potential
---    opportunities to improve listing performance.
+select
+    neighbourhood,
+    count(*) as total_listings,
+    round(avg(price), 2) as average_price,
+    round(avg(number_of_reviews), 2) as average_reviews
+from listings
+group by neighbourhood
+having count(*) >= 100
+order by average_price desc, average_reviews desc;
